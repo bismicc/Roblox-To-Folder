@@ -1,22 +1,24 @@
 # RBXLX Parser
 
-A Python utility for parsing Roblox Studio place files (`.rbxlx`) and extracting scripts and models into an organized folder structure.
+A Python tool for converting Roblox Studio place files (`.rbxlx`) to folders and back. Edit scripts and object properties externally, then rebuild to RBXLX format.
 
 ## Features
 
-- **Script Extraction**: Automatically extracts and saves Lua scripts with appropriate file extensions
+- Parse RBXLX files to folders and rebuild folders back to RBXLX files
+- Edit Lua scripts with proper file extensions:
   - `.server.lua` for Server Scripts
   - `.local.lua` for LocalScripts  
   - `.module.lua` for ModuleScripts
-- **Model Files**: Creates property files for all Roblox objects with their complete property data
-- **Hierarchical Structure**: Maintains the original game hierarchy in the output folder
-- **Property Support**: Handles various Roblox data types including Vector3, Color3, UDim2, and more
-- **Clean Filenames**: Automatically sanitizes object names for filesystem compatibility
+- Modify object properties through editable model files
+- Supports all major Roblox data types: `string`, `bool`, `int`, `float`, `Vector3`, `Color3`, `UDim2`, `CoordinateFrame`, etc.
+- Maintains original game hierarchy
+- Only modifies changed files during rebuild
+- Generates Studio-compatible RBXLX files
 
 ## Requirements
 
-- Python
-- No external dependencies (uses only Python standard library)
+- Python 3.6+
+- No external dependencies
 
 ## Installation
 
@@ -26,76 +28,79 @@ git clone https://github.com/bismicc/Roblox-To-Folder.git
 cd Roblox-To-Folder
 ```
 
-2. Make sure you have Python installed:
+2. Verify Python installation:
 ```bash
 python --version
 ```
 
 ## Usage
 
+### Parse RBXLX to Folders
 ```bash
-python main.py <rbxlx_file> <output_folder>
+python main.py parse <rbxlx_file> <output_folder>
 ```
 
-### Examples
+### Rebuild Folders to RBXLX
+```bash
+python main.py rebuild <input_folder> <output_rbxlx>
+```
+
+### Workflow Examples
 
 ```bash
-# Parse a place file and output to 'MyGame' folder
-python main.py MyPlace.rbxlx MyGame
+# 1. Parse your place file
+python main.py parse MyGame.rbxlx MyGameFiles
 
-# Parse with custom output directory
-python main.py TestPlace.rbxlx extracted_content
+# 2. Edit scripts and properties in the MyGameFiles folder
+
+# 3. Rebuild to create updated RBXLX
+python main.py rebuild MyGameFiles MyGame_Updated.rbxlx
+
+# 4. Load MyGame_Updated.rbxlx in Roblox Studio
 ```
 
 ## Output Structure
 
-The parser creates a folder structure that mirrors your Roblox game hierarchy:
-
 ```
 output_folder/
+├── .original.rbxlx          # Original file for rebuilding
+├── .element_map.json        # Element mapping for rebuild
 ├── Workspace/
-│   ├── Part.part.model
-│   ├── Script.server.lua
+│   ├── Part.part.model      # Editable object properties
+│   ├── Script.server.lua    # Editable script source
 │   └── Model/
 │       ├── LocalScript.local.lua
+│       ├── MeshPart.meshpart.model
 │       └── ModuleScript.module.lua
 ├── StarterGui/
-│   └── ScreenGui.screengui.model
+│   ├── ScreenGui.screengui.model
+│   └── MainMenu/
+│       ├── Frame.frame.model
+│       └── ButtonScript.local.lua
 └── ServerStorage/
-    └── GameSettings.modulescript.module.lua
+    ├── GameSettings.folder.model
+    └── DataHandler.module.lua
 ```
 
 ### File Types
 
-- **Scripts** (`.lua` files): Contains the actual Lua source code
-- **Models** (`.model` files): Contains object properties in a readable format
+- **Scripts** (`.lua` files): Lua source code that can be edited
+- **Models** (`.model` files): Object properties in editable format
+- **`.original.rbxlx`**: Exact copy used as rebuild template
+- **`.element_map.json`**: Tracks relationships for reconstruction
 
-## Supported Property Types
+## Editing Properties
 
-- `string` - Text values
-- `bool` - Boolean values  
-- `int`/`int64` - Integer numbers
-- `float` - Decimal numbers
-- `Vector3` - 3D coordinates (X, Y, Z)
-- `Color3` - RGB color values
-- `UDim2` - UI dimension values
-- `CoordinateFrame` - Position and rotation data
-- And more...
+Model files contain editable object properties:
 
-## Example Output
-
-### Script File (`.server.lua`)
+### Example Model File (`.part.model`)
 ```lua
-print("Hello from server!")
-game.Players.PlayerAdded:Connect(function(player)
-    print(player.Name .. " joined the game")
-end)
-```
-
-### Model File (`.part.model`)
-```lua
+-- RBXLX_CLASS: Part
+-- RBXLX_NAME: MyPart
+-- RBXLX_ORIGINAL_PROPS: {...}
 -- Part Properties
 -- Name: MyPart
+-- Edit the values below. Maintain the exact format for proper rebuilding.
 
 Name = 'MyPart'
 Size = {
@@ -105,50 +110,113 @@ Size = {
 }
 Position = {
     X = 0.0,
-    Y = 0.5,
+    Y = 10.5,
     Z = 0.0,
 }
-BrickColor = 'Bright blue'
-Material = 'Plastic'
+BrickColor = 'Bright red'
+Material = 'Neon'
+Transparency = 0.5
+CanCollide = True
+Anchored = False
 ```
+
+### Editing Guidelines
+
+- Keep the exact syntax for proper reconstruction
+- Use appropriate data types:
+  - Strings: `'text'` or `"text"`
+  - Numbers: `1.5`, `42`
+  - Booleans: `True`/`False`
+  - Dictionaries: `{X = 1.0, Y = 2.0, Z = 3.0}`
+- Don't modify metadata comments at the top
+
+## Supported Property Types
+
+- **Basic**: `string`, `bool`, `int`/`int64`, `float`
+- **3D**: `Vector3` (X, Y, Z), `Color3` (R, G, B), `CoordinateFrame` (position/rotation)
+- **UI**: `UDim2` (XS, XO, YS, YO)
+- **Roblox**: `BrickColor`, `Material`, `Enum` values, and more
+
+## How It Works
+
+The rebuild process:
+- Compares current files against original values
+- Only modifies elements that actually changed
+- Preserves original XML structure for unchanged elements
+- Uses text replacement on raw XML for precision
+- Maintains referent IDs and element relationships
 
 ## Error Handling
 
-The parser handles common issues gracefully:
-- Invalid XML structure
-- Missing files
-- Corrupted property data
-- Invalid characters in filenames
+Common issues handled:
+- Invalid XML structure in source files
+- Missing or corrupted files
+- Invalid property values or syntax errors
+- Missing template files during rebuild
+
+## Troubleshooting
+
+### "Original RBXLX file not found" Error
+Parse your RBXLX file first to create the `.original.rbxlx` template. Don't delete hidden files.
+
+### "Invalid property value" Warnings
+Check that property values use correct Python syntax and maintain dictionary formats for complex types.
+
+### Studio Loading Errors
+1. Check all `.lua` files for syntax errors
+2. Ensure `.model` files haven't been corrupted
+3. Verify original folder structure is intact
+
+### Property Changes Not Applied
+1. Maintain the exact format shown in examples
+2. Check property names match exactly (case-sensitive)
+3. Verify data type is appropriate for the property
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
 5. Open a Pull Request
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Changelog
 
+### v2.1.0
+- Added support for modifying object properties
+- Enhanced model files with rebuild metadata
+- Property type support for Vector3, Color3, UDim2, etc.
+- Change detection for properties
+- Better error handling and validation
+
+### v2.0.0
+- Added bidirectional conversion (rebuild functionality)
+- Diff-based rebuilding system
+- Smart CDATA handling
+- Element mapping system
+
 ### v1.0.0
 - Initial release
-- Basic script and model extraction
-- Support for major Roblox property types
-- Hierarchical folder structure generation
+- Script and model extraction
+- Hierarchical folder structure
 
 ## Issues and Support
 
-If you encounter any issues or have feature requests, please [open an issue](https://github.com/yourusername/rbxlx-parser/issues) on GitHub.
+Open an issue on GitHub with:
+- Python version
+- Source RBXLX file size
+- Error messages
+- Steps to reproduce
 
 ## Related Projects
 
-- [Rojo](https://github.com/rojo-rbx/rojo) - A project management tool for Roblox
-- [Remodel](https://github.com/rojo-rbx/remodel) - A scriptable tool for manipulating Roblox files
+- [Rojo](https://github.com/rojo-rbx/rojo) - Roblox project management tool
+- [Remodel](https://github.com/rojo-rbx/remodel) - Scriptable Roblox file manipulation
 
 ## Disclaimer
 
-This tool is not affiliated with Roblox Corporation. RBXLX files and Roblox Studio are trademarks of Roblox Corporation.
+Not affiliated with Roblox Corporation. RBXLX files and Roblox Studio are trademarks of Roblox Corporation.
